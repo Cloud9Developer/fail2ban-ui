@@ -435,10 +435,6 @@ func (sc *SSHConnector) TestLogpathWithResolution(ctx context.Context, logpath s
 	return originalPath, resolvedPath, files, nil
 }
 
-func (sc *SSHConnector) UpdateDefaultSettings(ctx context.Context) error {
-	return sc.EnsureJailLocalStructure(ctx)
-}
-
 func (sc *SSHConnector) CheckJailLocalIntegrity(ctx context.Context) (bool, bool, error) {
 	jailLocalPath := JailLocal(sc.getFail2banPath(ctx))
 	output, err := sc.runRemoteCommand(ctx, []string{"cat", jailLocalPath})

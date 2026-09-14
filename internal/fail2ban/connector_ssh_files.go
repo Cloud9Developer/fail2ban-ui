@@ -29,10 +29,14 @@ const (
 	bannedSectionEnd      = "F2BUI_BANNED_END"
 	batchJailLocalBegin   = "F2BUI_JAILLOCAL_BEGIN"
 	batchJailLocalMissing = "F2BUI_JAILLOCAL_MISSING"
+	batchActionBegin      = "F2BUI_ACTION_BEGIN"
+	batchActionMissing    = "F2BUI_ACTION_MISSING"
 	batchEnd              = "F2BUI_BATCH_END"
 	batchFileBegin        = "F2BUI_FILE_BEGIN:"
 	batchFileEnd          = "F2BUI_FILE_END"
 	filterPathMarker      = "FILTER_PATH:"
+	missingToolsMarker    = "F2BUI_MISSING_TOOLS:"
+	permWarningMarker     = "F2BUI_PERM_WARNING:"
 )
 
 type remoteFile struct {
@@ -152,6 +156,32 @@ func buildRemoteWriteScript(filePath, content string) (string, error) {
 	}
 	body := strings.TrimSuffix(content, "\n")
 	return fmt.Sprintf("cat > %s <<'%s'\n%s\n%s\n", quoted, remoteWriteDelimiter, body, remoteWriteDelimiter), nil
+}
+
+func buildEnsureActionScript(actionPath, content string) (string, error) {
+	quotedDir, err := quoteRemotePath(filepath.Dir(actionPath))
+	if err != nil {
+		return "", err
+	}
+	quotedFile, err := quoteRemotePath(actionPath)
+	if err != nil {
+		return "", err
+	}
+	write, err := buildRemoteWriteScript(actionPath, content)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(`set -e
+mkdir -p %s
+umask 077
+%schmod 600 %s 2>/dev/null || true
+if [ -n "$(find %s -perm -o+r 2>/dev/null)" ]; then printf '%s%%s\n' %s; fi
+missing=''
+for t in jq curl; do
+	command -v "$t" >/dev/null 2>&1 || missing="${missing:+$missing,}$t"
+done
+if [ -n "$missing" ]; then printf '%s%%s\n' "$missing"; fi
+`, quotedDir, write, quotedFile, quotedFile, permWarningMarker, quotedFile, missingToolsMarker), nil
 }
 
 func (sc *SSHConnector) writeRemoteFile(ctx context.Context, filePath, content string) error {

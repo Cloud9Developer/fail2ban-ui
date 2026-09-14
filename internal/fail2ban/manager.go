@@ -57,10 +57,7 @@ type Connector interface {
 	SetJailConfig(ctx context.Context, jail, content string) error
 	TestLogpathWithResolution(ctx context.Context, logpath string) (originalPath, resolvedPath string, files []string, err error)
 
-	// Default settings operations
-	UpdateDefaultSettings(ctx context.Context) error
-
-	// Jail local structure management
+	// Jail local structure management (jail.local carries the [DEFAULT] block).
 	EnsureJailLocalStructure(ctx context.Context) error
 
 	// CheckJailLocalIntegrity checks whether jail.local exists and contains the
@@ -314,6 +311,26 @@ func (m *Manager) UpdateActionFileForServer(ctx context.Context, serverID string
 		return fmt.Errorf("connector for server %s not found or not enabled", serverID)
 	}
 	return updateConnectorAction(ctx, conn)
+}
+
+func (m *Manager) RepairActionFile(ctx context.Context, serverID string) {
+	m.mu.RLock()
+	conn := m.connectors[serverID]
+	m.mu.RUnlock()
+
+	sc, ok := conn.(*SSHConnector)
+	if !ok || !sc.beginActionRepair() {
+		return
+	}
+	name := sc.Server().Name
+	if err := sc.ensureAction(ctx); err != nil {
+		log.Printf("warning: the callback action file on %s is out of date and could not be rewritten: %v", name, err)
+		return
+	}
+	log.Printf("the callback action file on %s was out of date, rewrote it", name)
+	if err := sc.Reload(ctx); err != nil {
+		log.Printf("warning: failed to reload fail2ban on %s after rewriting the callback action file: %v", name, err)
+	}
 }
 
 func updateConnectorAction(ctx context.Context, conn Connector) error {
