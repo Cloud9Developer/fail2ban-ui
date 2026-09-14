@@ -29,7 +29,7 @@ Rules:
 
 * Use a single leading slash and no trailing slash: `/myf2b`, not `myf2b/`.
 * When set, the application is served only under that prefix. Visiting `/` redirects to `{BASE_PATH}/`; non-prefixed paths are not served.
-* The reverse proxy must forward requests *with* the path prefix to Fail2Ban UI. See [reverse-proxy.md](reverse-proxy.md).
+* The reverse proxy must forward requests *with* the path prefix to Fail2Ban UI and must not strip it. See [reverse-proxy.md](reverse-proxy.md).
 
 When `BASE_PATH` is set, align the related URLs:
 
