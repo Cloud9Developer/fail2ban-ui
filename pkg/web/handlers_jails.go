@@ -458,8 +458,8 @@ func UpdateJailManagementHandler(c *gin.Context) {
 		}
 	}
 
-	// Pre-validates logpath resolution for jails that are about to be enabled.
-	// This prevents enabling jails with broken/non-existent logpaths.
+	// Pre-validates logpath resolution so a jail with a broken logpath is not enabled.
+	var unverifiedJails []string
 	for jailName := range enabledJails {
 		jailCfg, _, cfgErr := conn.GetJailConfig(c.Request.Context(), jailName)
 		if cfgErr != nil {
@@ -469,20 +469,14 @@ func UpdateJailManagementHandler(c *gin.Context) {
 			return
 		}
 
+		// No logpath is legitimate -> journal backend, or a jail defined in jail.conf
 		rawLogpath := strings.TrimSpace(fail2ban.ExtractLogpathFromJailConfig(jailCfg))
-		if rawLogpath == "" {
-			c.JSON(http.StatusOK, gin.H{
-				"error": fmt.Sprintf("Jail '%s' cannot be enabled: no logpath configured. Please configure a valid logpath first.", jailName),
-			})
-			return
-		}
-
 		paths := splitLogpaths(rawLogpath)
 		if len(paths) == 0 {
-			c.JSON(http.StatusOK, gin.H{
-				"error": fmt.Sprintf("Jail '%s' cannot be enabled: logpath is empty after parsing. Please configure a valid logpath first.", jailName),
-			})
-			return
+			log.Printf("WARNING: no logpath resolvable for jail %s on server %s; enabling anyway and relying on fail2ban to validate it",
+				jailName, conn.Server().Name)
+			unverifiedJails = append(unverifiedJails, jailName)
+			continue
 		}
 
 		foundAnyFiles := false
@@ -512,6 +506,7 @@ func UpdateJailManagementHandler(c *gin.Context) {
 			if inaccessible {
 				log.Printf("WARNING: cannot verify logpath(s) for jail %s on server %s (log directory not readable by the connector's user); enabling anyway and relying on fail2ban (root) to read them",
 					jailName, conn.Server().Name)
+				unverifiedJails = append(unverifiedJails, jailName)
 			} else {
 				c.JSON(http.StatusOK, gin.H{
 					"error": fmt.Sprintf("Jail '%s' cannot be enabled because no matching log files were found for its logpath(s): %s", jailName, strings.Join(checkErrors, "; ")),
@@ -642,7 +637,13 @@ func UpdateJailManagementHandler(c *gin.Context) {
 		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Jail settings updated and fail2ban reloaded successfully"})
+	resp := gin.H{"message": "Jail settings updated and fail2ban reloaded successfully"}
+	if len(unverifiedJails) > 0 {
+		sort.Strings(unverifiedJails)
+		resp["warning"] = fmt.Sprintf("Enabled, but the log source of %s could not be verified by the UI. This is expected for jails using the systemd journal or defined in jail.conf.",
+			"'"+strings.Join(unverifiedJails, "', '")+"'")
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // Creates a new jail with the given name and optional config.
