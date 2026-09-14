@@ -265,6 +265,8 @@ actionunban = /usr/bin/curl__CURL_INSECURE_FLAG__ -X POST __CALLBACK_URL__/api/u
                  --arg hostname '<fq-hostname>' \
                  '{serverId: $serverId, ip: $ip, jail: $jail, hostname: $hostname}')"
 
+actionflush = true
+
 [Init]
 
 # Default name of the chain

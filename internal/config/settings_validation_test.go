@@ -102,6 +102,26 @@ func TestFail2banActionTemplateRobustness(t *testing.T) {
 	}
 }
 
+func TestFail2banActionTemplateFlushesInOneCall(t *testing.T) {
+	t.Parallel()
+
+	if !strings.Contains(fail2banActionTemplate, "\nactionflush = ") {
+		t.Fatal("action template must define actionflush so a stop/restart does not fire actionunban per banned IP")
+	}
+	if !strings.Contains(fail2banActionTemplate, "norestored = 1") {
+		t.Fatal("action template must keep norestored = 1 so restored bans are not re-reported on startup")
+	}
+	content := BuildFail2banActionConfig("http://127.0.0.1:9999", "srv-test", "secret")
+	if !strings.Contains(content, "\nactionflush = ") {
+		t.Fatal("rendered action config lost actionflush")
+	}
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(line, "actionflush") && strings.Contains(line, "curl") {
+			t.Fatalf("actionflush must not issue a callback, got %q", line)
+		}
+	}
+}
+
 func TestFail2banActionConfigEscapesPercent(t *testing.T) {
 	t.Parallel()
 
