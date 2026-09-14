@@ -72,8 +72,7 @@ func intFromNull(ni sql.NullInt64) int {
 }
 
 const (
-	storageTimeFormat       = "2006-01-02T15:04:05.000000000Z"
-	legacyStorageTimeFormat = "2006-01-02 15:04:05.999999999"
+	storageTimeFormat = "2006-01-02T15:04:05.000000000Z"
 )
 
 func formatStorageTime(t time.Time) string {
