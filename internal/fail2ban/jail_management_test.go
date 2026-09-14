@@ -163,3 +163,69 @@ func TestSanitizeLogpath(t *testing.T) {
 		}
 	}
 }
+
+func TestExtractFilterFromJailConfig(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"plain filter", "[sshd]\nenabled = true\nfilter = sshd\n", "sshd"},
+		{"filter with parameters", "filter = apache-auth[mode=aggressive]\n", "apache-auth"},
+		{"spaces around value", "filter    =    nginx-limit-req   \n", "nginx-limit-req"},
+		{"uppercase key", "FILTER = sshd\n", "sshd"},
+		{"commented filter is ignored", "#filter = evil\nfilter = sshd\n", "sshd"},
+		{"only a commented filter", "# filter = sshd\n", ""},
+		{"no filter key", "[sshd]\nenabled = true\n", ""},
+		{"empty input", "", ""},
+		{"first filter wins", "filter = one\nfilter = two\n", "one"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ExtractFilterFromJailConfig(tc.in); got != tc.want {
+				t.Fatalf("ExtractFilterFromJailConfig(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+// Paths come back newline-separated; splitLogpaths consumes that.
+func TestExtractLogpathFromJailConfig(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"single path", "logpath = /var/log/auth.log\n", "/var/log/auth.log"},
+		{
+			"several paths on one line",
+			"logpath = /var/log/a.log /var/log/b.log\n",
+			"/var/log/a.log\n/var/log/b.log",
+		},
+		{
+			"continuation lines are collected",
+			"logpath = /var/log/a.log\n          /var/log/b.log\n          /var/log/c.log\nmaxretry = 3\n",
+			"/var/log/a.log\n/var/log/b.log\n/var/log/c.log",
+		},
+		{
+			"continuation stops at a comment",
+			"logpath = /var/log/a.log\n          /var/log/b.log\n# /var/log/ignored.log\n",
+			"/var/log/a.log\n/var/log/b.log",
+		},
+		{
+			"continuation stops at the next key",
+			"logpath = /var/log/a.log\n          /var/log/b.log\nenabled = true\n",
+			"/var/log/a.log\n/var/log/b.log",
+		},
+		{"commented logpath is ignored", "# logpath = /var/log/evil.log\n", ""},
+		{"no logpath key", "[sshd]\nenabled = true\n", ""},
+		{"empty input", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ExtractLogpathFromJailConfig(tc.in); got != tc.want {
+				t.Fatalf("ExtractLogpathFromJailConfig(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}

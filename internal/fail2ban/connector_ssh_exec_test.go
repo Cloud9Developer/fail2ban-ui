@@ -182,3 +182,90 @@ func TestExecSSHStdinIsDelivered(t *testing.T) {
 		t.Fatalf("stdin must reach the remote command, got %q", stdout)
 	}
 }
+
+func TestEnsureActionUsesProbedConfigRoot(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "invocations")
+	t.Setenv("F2BUI_TEST_SSH_LOG", log)
+	withFakeSSH(t, `case "$*" in
+  *"-O check"*) exit 0 ;;
+  *"test -d"*)  echo "/config/fail2ban"; exit 0 ;;
+esac
+printf '%s\n' "$*" >> "$F2BUI_TEST_SSH_LOG"
+exit 0
+`)
+	SetProvider(testProvider{})
+	defer SetProvider(noopProvider{})
+
+	sc := testSSHConnector()
+	if err := sc.ensureAction(context.Background()); err != nil {
+		t.Fatalf("ensureAction failed: %v", err)
+	}
+
+	raw, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatalf("fake ssh recorded nothing: %v", err)
+	}
+	recorded := string(raw)
+	if !strings.Contains(recorded, "/config/fail2ban/action.d/ui-custom-action.conf") {
+		t.Fatalf("action file must follow the probed root, got:\n%s", recorded)
+	}
+	if strings.Contains(recorded, "/etc/fail2ban/action.d") {
+		t.Fatalf("action file must not go to the hardcoded default root, got:\n%s", recorded)
+	}
+	if strings.Contains(recorded, "sudo") {
+		t.Fatalf("the action write must run as the service account, got:\n%s", recorded)
+	}
+	if !strings.Contains(recorded, "http://127.0.0.1:8080/api/ban") {
+		t.Fatalf("the current callback URL must be written into the file, got:\n%s", recorded)
+	}
+}
+
+func TestGetJailSummaryReportsActionDrift(t *testing.T) {
+	SetProvider(testProvider{})
+	defer SetProvider(noopProvider{})
+
+	summaryOutput := func(actionContent string) string {
+		return strings.Join([]string{
+			"[{'sshd': ['1.2.3.4']}]",
+			bannedSectionEnd,
+			batchJailLocalBegin,
+			"[DEFAULT]",
+			"action = ui-custom-action",
+			batchActionBegin,
+			actionContent,
+			batchEnd,
+			"",
+		}, "\n")
+	}
+
+	t.Run("matching action file is not drifted", func(t *testing.T) {
+		sc := testSSHConnector()
+		sc.fail2banPath = DefaultConfigRoot
+		want := strings.TrimSuffix(sc.desiredActionConfig(), "\n")
+		withFakeSSH(t, "cat >/dev/null 2>&1\ncat <<'OUT'\n"+summaryOutput(want)+"OUT\nexit 0\n")
+
+		got, err := sc.GetJailSummary(context.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.ActionFileDrifted {
+			t.Fatal("an up-to-date action file must not be reported as drifted")
+		}
+	})
+
+	t.Run("stale callback URL is drifted", func(t *testing.T) {
+		sc := testSSHConnector()
+		sc.fail2banPath = DefaultConfigRoot
+		stale := strings.ReplaceAll(strings.TrimSuffix(sc.desiredActionConfig(), "\n"),
+			"http://127.0.0.1:8080", "http://old.example.com")
+		withFakeSSH(t, "cat >/dev/null 2>&1\ncat <<'OUT'\n"+summaryOutput(stale)+"OUT\nexit 0\n")
+
+		got, err := sc.GetJailSummary(context.Background())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.ActionFileDrifted {
+			t.Fatal("an action file with an outdated callback URL must be reported as drifted")
+		}
+	})
+}

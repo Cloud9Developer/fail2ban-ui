@@ -36,7 +36,8 @@ func (testProvider) CallbackURL() string                      { return "http://1
 func (testProvider) CallbackSecret() string                   { return "test-secret" }
 func (testProvider) ServerPort() int                          { return 8080 }
 func (testProvider) BuildFail2banActionConfig(callbackURL, serverID, secret string) string {
-	return ""
+	return fmt.Sprintf("[Definition]\nactionban = curl -X POST %s/api/ban -H 'X-Callback-Secret: %s' --data 'serverId=%s'\n",
+		callbackURL, secret, serverID)
 }
 func (testProvider) BuildJailLocalContent() string {
 	return "[DEFAULT]\nenabled = true\naction_mwlg = %(action_)s\n             ui-custom-action[logpath=\"%(logpath)s\", chain=\"%(chain)s\"]\naction = %(action_mwlg)s\n"

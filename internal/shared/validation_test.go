@@ -47,3 +47,71 @@ func TestIsReservedIP(t *testing.T) {
 		}
 	}
 }
+
+// Gate between user input and fail2ban-client arguments.
+func TestValidateIP(t *testing.T) {
+	valid := []string{
+		"1.2.3.4",
+		"203.0.113.77",
+		"255.255.255.255",
+		"::1",
+		"2001:db8::1",
+		"10.0.0.0/8",
+		"2001:db8::/32",
+	}
+	for _, ip := range valid {
+		t.Run("valid/"+ip, func(t *testing.T) {
+			if err := ValidateIP(ip); err != nil {
+				t.Fatalf("ValidateIP(%q) = %v, want nil", ip, err)
+			}
+		})
+	}
+
+	invalid := []string{
+		"",
+		"   ",
+		"not-an-ip",
+		"1.2.3",
+		"1.2.3.256",
+		"1.2.3.4;rm -rf /",
+		"1.2.3.4 && curl evil",
+		"$(whoami)",
+		"10.0.0.0/33",
+		"../../etc/passwd",
+	}
+	for _, ip := range invalid {
+		t.Run("invalid/"+ip, func(t *testing.T) {
+			if err := ValidateIP(ip); err == nil {
+				t.Fatalf("ValidateIP(%q) = nil, want an error", ip)
+			}
+		})
+	}
+}
+
+func TestSplitCommaList(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want []string
+	}{
+		{"empty", "", nil},
+		{"only whitespace", "   ", nil},
+		{"only separators", ",,,", nil},
+		{"single", "a", []string{"a"}},
+		{"trims entries", " a , b ,c ", []string{"a", "b", "c"}},
+		{"drops empty entries", "a,,b,", []string{"a", "b"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SplitCommaList(tc.in)
+			if len(got) != len(tc.want) {
+				t.Fatalf("SplitCommaList(%q) = %#v, want %#v", tc.in, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Fatalf("SplitCommaList(%q) = %#v, want %#v", tc.in, got, tc.want)
+				}
+			}
+		})
+	}
+}
