@@ -88,7 +88,7 @@ function loadServers() {
 function renderServerSelector() {
   var container = document.getElementById('serverSelectorContainer');
   if (!container) return;
-  var enabledServers = serversCache.filter(function(s) { return s.enabled; });
+  var enabledServers = sortServersForDisplay(serversCache.filter(function(s) { return s.enabled; }));
   if (!serversCache.length) {
     container.innerHTML = '<div class="text-sm text-red-500" data-i18n="servers.selector.empty">No servers configured</div>';
     if (typeof updateTranslations === 'function') {
@@ -168,7 +168,7 @@ function renderServerManagerList() {
 
   emptyState.classList.add('hidden');
 
-  var html = serversCache.map(function(server) {
+  var html = sortServersForDisplay(serversCache).map(function(server) {
     var statusBadge = server.enabled
       ? '<span class="ml-2 text-xs font-semibold text-green-600" data-i18n="servers.badge.enabled">Enabled</span>'
       : '<span class="ml-2 text-xs font-semibold text-gray-500" data-i18n="servers.badge.disabled">Disabled</span>';

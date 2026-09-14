@@ -825,7 +825,7 @@ function renderLogOverviewContent() {
     + '    <label for="recentEventsServer" class="block text-sm font-medium text-gray-700 mb-1" data-i18n="logs.search.server_label">Server</label>'
     + '    <select id="recentEventsServer" class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onchange="updateBanEventsServer(this.value)">'
     + '      <option value="all"' + (banEventsFilterServer === 'all' ? ' selected' : '') + ' data-i18n="logs.search.server_all">All servers</option>';
-  serversCache.filter(function(server) { return server.enabled; }).forEach(function(server) {
+  sortServersForDisplay(serversCache.filter(function(server) { return server.enabled; })).forEach(function(server) {
     var selected = banEventsFilterServer === server.id ? ' selected' : '';
     html += '<option value="' + escapeHtml(server.id) + '"' + selected + '>' + escapeHtml(server.name || server.id) + '</option>';
   });

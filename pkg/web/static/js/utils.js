@@ -210,3 +210,11 @@ function buildHighlightedLogsHtml(logs, ip) {
 function countryLabel(country) {
   return country || t('logs.overview.country_unknown', 'Unknown');
 }
+
+function sortServersForDisplay(servers) {
+  return (servers || []).slice().sort(function (a, b) {
+    var an = a.name || a.id || '';
+    var bn = b.name || b.id || '';
+    return an.localeCompare(bn, undefined, { numeric: true, sensitivity: 'base' });
+  });
+}
