@@ -116,11 +116,18 @@ func applySettingsUpdate(c *gin.Context, req config.AppSettings) {
 		return
 	}
 
+	var warnings []string
+	warn := func(format string, v ...interface{}) {
+		msg := fmt.Sprintf(format, v...)
+		log.Printf("WARNING: %s", msg)
+		warnings = append(warnings, msg)
+	}
+
 	if callbackChanged {
 		config.DebugLog("Callback URL or secret changed, updating action files and reloading fail2ban on all servers")
 
 		if err := fail2ban.GetManager().UpdateActionFiles(c.Request.Context()); err != nil {
-			config.DebugLog("Warning: failed to update some remote action files: %v", err)
+			warn("Failed to update the callback action file on one or more servers: %v", err)
 		}
 
 		connectors := fail2ban.GetManager().Connectors()
@@ -129,7 +136,7 @@ func applySettingsUpdate(c *gin.Context, req config.AppSettings) {
 			if (server.Type == "ssh" || server.Type == "agent") && server.Enabled {
 				config.DebugLog("Reloading fail2ban on %s after callback change", server.Name)
 				if err := conn.Reload(c.Request.Context()); err != nil {
-					config.DebugLog("Warning: failed to reload fail2ban on %s after updating action file: %v", server.Name, err)
+					warn("Action file updated on %s, but the Fail2Ban reload failed: %v", server.Name, err)
 				} else {
 					config.DebugLog("Successfully reloaded fail2ban on %s", server.Name)
 				}
@@ -140,12 +147,12 @@ func applySettingsUpdate(c *gin.Context, req config.AppSettings) {
 		for _, server := range settings.Servers {
 			if server.Type == "local" && server.Enabled {
 				if err := config.EnsureLocalFail2banAction(server); err != nil {
-					config.DebugLog("Warning: failed to update local action file: %v", err)
+					warn("Failed to update the local callback action file on %s: %v", server.Name, err)
 				} else {
 					if conn, err := fail2ban.GetManager().Connector(server.ID); err == nil {
 						config.DebugLog("Reloading local fail2ban after callback change")
 						if reloadErr := conn.Reload(c.Request.Context()); reloadErr != nil {
-							config.DebugLog("Warning: failed to reload local fail2ban after updating action file: %v", reloadErr)
+							warn("Local action file updated, but the Fail2Ban reload failed: %v", reloadErr)
 						} else {
 							config.DebugLog("Successfully reloaded local fail2ban")
 						}
@@ -167,38 +174,32 @@ func applySettingsUpdate(c *gin.Context, req config.AppSettings) {
 		oldSettings.BanactionAllports != newSettings.BanactionAllports ||
 		oldSettings.Chain != newSettings.Chain
 
+	restartNeeded := newSettings.RestartNeeded
 	if defaultSettingsChanged {
 		config.DebugLog("Fail2Ban DEFAULT settings changed, pushing to all enabled servers")
+		restartNeeded = false
 		connectors := fail2ban.GetManager().Connectors()
-		var updateErrors []string
 		for _, conn := range connectors {
 			server := conn.Server()
 			config.DebugLog("Updating DEFAULT settings on server: %s (type: %s)", server.Name, server.Type)
-			if err := conn.UpdateDefaultSettings(c.Request.Context()); err != nil {
-				errorMsg := fmt.Sprintf("Failed to update DEFAULT settings on %s: %v", server.Name, err)
-				log.Printf("WARNING: %s", errorMsg)
-				updateErrors = append(updateErrors, errorMsg)
+			// jail.local carries the [DEFAULT] block, so rewriting it is the push.
+			if err := conn.EnsureJailLocalStructure(c.Request.Context()); err != nil {
+				warn("Failed to update DEFAULT settings on %s: %v", server.Name, err)
 			} else {
 				config.DebugLog("Successfully updated DEFAULT settings on %s", server.Name)
 				if err := conn.Reload(c.Request.Context()); err != nil {
-					config.DebugLog("Warning: failed to reload fail2ban on %s after updating DEFAULT settings: %v", server.Name, err)
-					updateErrors = append(updateErrors, fmt.Sprintf("Settings updated on %s, but reload failed: %v", server.Name, err))
+					warn("Settings updated on %s, but reload failed: %v", server.Name, err)
 				} else {
 					config.DebugLog("Successfully reloaded fail2ban on %s", server.Name)
 				}
 			}
 		}
-		c.JSON(http.StatusOK, settingsUpdateResponse{
-			Message:       "Settings updated",
-			RestartNeeded: false,
-			Warnings:      updateErrors,
-		})
-		return
 	}
 
 	c.JSON(http.StatusOK, settingsUpdateResponse{
 		Message:       "Settings updated",
-		RestartNeeded: newSettings.RestartNeeded,
+		RestartNeeded: restartNeeded,
+		Warnings:      warnings,
 	})
 }
 

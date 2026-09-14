@@ -122,9 +122,11 @@ func UpsertServerHandler(c *gin.Context) {
 		return
 	}
 
+	var actionFileWarning string
 	if (justEnabled || tunnelChanged) && (server.Type == "ssh" || server.Type == "agent") {
 		if err := fail2ban.GetManager().UpdateActionFileForServer(c.Request.Context(), server.ID); err != nil {
-			config.DebugLog("Warning: failed to update action file for server %s: %v", server.Name, err)
+			log.Printf("WARNING: failed to update the callback action file for server %s: %v", server.Name, err)
+			actionFileWarning = err.Error()
 		}
 		if tunnelChanged {
 			if conn, err := fail2ban.GetManager().Connector(server.ID); err == nil {
@@ -136,7 +138,6 @@ func UpsertServerHandler(c *gin.Context) {
 	}
 
 	// Ensures the jail.local structure is properly initialized for newly enabled/added servers
-	var actionFileWarning string
 	var jailLocalWarning bool
 	var restartWarning string
 	if justEnabled && server.Type == "local" {

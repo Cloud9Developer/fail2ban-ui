@@ -35,7 +35,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/swissmakers/fail2ban-ui/internal/config"
 	"github.com/swissmakers/fail2ban-ui/internal/fail2ban"
-	"github.com/swissmakers/fail2ban-ui/internal/integrations"
+	"github.com/swissmakers/fail2ban-ui/internal/shared"
 	"github.com/swissmakers/fail2ban-ui/internal/storage"
 )
 
@@ -94,6 +94,10 @@ func SummaryHandler(c *gin.Context) {
 		}
 	}
 
+	if summary.ActionFileDrifted {
+		fail2ban.GetManager().RepairActionFile(c.Request.Context(), serverID)
+	}
+
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -101,7 +105,7 @@ func SummaryHandler(c *gin.Context) {
 // fail2ban-client, unlike the dashboard which only searches stored ban events.
 func SearchBannedIPHandler(c *gin.Context) {
 	ip := c.Param("ip")
-	if err := integrations.ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP: " + err.Error()})
 		return
 	}
@@ -265,7 +269,7 @@ func BanIPHandler(c *gin.Context) {
 	jail := c.Param("jail")
 	ip := c.Param("ip")
 
-	if err := integrations.ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -297,7 +301,7 @@ func UnbanIPHandler(c *gin.Context) {
 	jail := c.Param("jail")
 	ip := c.Param("ip")
 
-	if err := integrations.ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -361,7 +365,7 @@ func BanNotificationHandler(c *gin.Context) {
 	log.Printf("Parsed ban request successfully - IP: %s, Jail: %s, Hostname: %s, Failures: %s",
 		request.IP, request.Jail, request.Hostname, request.Failures)
 
-	if err := integrations.ValidateIP(request.IP); err != nil {
+	if err := shared.ValidateIP(request.IP); err != nil {
 		log.Printf("WARNING: Invalid IP in ban notification: %s", request.IP)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP: " + err.Error()})
 		return
@@ -417,7 +421,7 @@ func UnbanNotificationHandler(c *gin.Context) {
 	log.Printf("Parsed unban request successfully - IP: %s, Jail: %s, Hostname: %s",
 		request.IP, request.Jail, request.Hostname)
 
-	if err := integrations.ValidateIP(request.IP); err != nil {
+	if err := shared.ValidateIP(request.IP); err != nil {
 		log.Printf("WARNING: Invalid IP in unban notification: %s", request.IP)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP: " + err.Error()})
 		return
