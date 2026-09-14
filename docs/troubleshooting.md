@@ -77,6 +77,15 @@ Recommended minimum sudoers for SSH connector accounts:
 
 **Note:** Fail2Ban UI executes the Fail2Ban commands with `sudo` over SSH. The `NOPASSWD` option is therefore required.
 
+Configuration files, including `ui-custom-action.conf`, are written as the service account itself, not through `sudo`. The account therefore needs write access to the Fail2Ban configuration tree, `action.d` included. Grant it with an ACL rather than a new sudoers entry:
+
+```bash
+setfacl -R -m u:<user>:rwX /etc/fail2ban
+setfacl -R -d -m u:<user>:rwX /etc/fail2ban
+```
+
+A file left over from an earlier root-owned install can still be unwritable for the account. Remove it and let the UI recreate it.
+
 ## Ban/unban notifications do not appear in the UI
 
 This is one of the most common issues. The UI receives ban and unban events from Fail2Ban through HTTP callbacks. If nothing appears on the dashboard or under "Recent stored events", the callback chain is broken somewhere. Work through the following steps in order.
@@ -92,7 +101,16 @@ cat /etc/fail2ban/action.d/ui-custom-action.conf
 # to your callback URL, for example http://10.88.0.1:8080/api/ban
 ```
 
-If the file does not exist or looks wrong, go to **Settings -> Manage Servers** in the UI, select the server, and click **Test connection**. The UI re-deploys the action file automatically for local connectors.
+On containerised hosts the file lives under `/config/fail2ban/action.d/` instead. The UI writes it wherever that host keeps its Fail2Ban configuration.
+
+The UI rewrites this file on start, whenever you change the callback URL or secret, and whenever it reads the server's jail status and finds the file out of date. If the URL is still wrong, the UI could not write the file - it reports the reason as a warning when you save the settings, and logs it. Check that the SSH service account may write to `action.d` (see the SSH connector section below).
+
+Two values are expected to differ from the global callback URL:
+
+- Servers with **reverse tunnel for events** enabled carry `http://localhost:<tunnel port>`. That is correct, see [Reverse SSH tunnel for callbacks](configuration.md).
+- Servers running the agent have no action file at all. The agent holds its callback configuration itself and refreshes it on every poll.
+
+If the file does not exist or looks wrong, go to **Settings -> Manage Servers** in the UI, select the server, and click **Test connection**.
 
 ### Step 2: Verify jail.local references the action
 

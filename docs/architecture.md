@@ -28,13 +28,13 @@ A *connector* is the mechanism the UI uses to control a single Fail2Ban instance
 | Connector | Transport                                                                             | Typical use                                                                   | Requirements on the managed host                                                                                   |
 | --------- | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Local     | Unix socket and direct file access                                                    | Fail2Ban runs on the same host as the UI                                      | Read/write access to `/var/run/fail2ban/fail2ban.sock` and `/etc/fail2ban`; read access to the monitored log files |
-| SSH       | SSH with key-based authentication; optional reverse tunnel (`-R`) for the event path  | Remote hosts where installing additional software is not wanted               | A dedicated service account with `sudo fail2ban-client `* and `sudo systemctl restart fail2ban`                    |
+| SSH       | SSH with key-based authentication; optional reverse tunnel (`-R`) for the event path  | Remote hosts where installing additional software is not wanted               | A POSIX shell, `jq` and `curl`, plus a dedicated service account with `sudo fail2ban-client `* and `sudo systemctl restart fail2ban` |
 | Agent     | HTTP to the [fail2ban-ui-agent](https://github.com/swissmakers/fail2ban-ui-agent) API | Environments where SSH access from the UI host is not desired or not possible | The agent service, with local access to the Fail2Ban socket and configuration                                      |
 
 
 All three connectors implement the same operations: reading the jail summary and banned IPs, banning and unbanning addresses, reading and writing jail and filter configuration, testing filters and log paths, creating and deleting jails, and restarting or reloading Fail2Ban.
 
-When a new server is added, the connector also installs the callback action (`ui-custom-action.conf`) into `action.d` on the managed host, so that the Event path works without manual configuration.
+When a new server is added, the connector also installs the callback action (`ui-custom-action.conf`) into `action.d` under the host's own Fail2Ban configuration root, so that the Event path works without manual configuration. The connector reinstalls it on start and whenever the callback URL or secret changes, and repairs it when it finds the file out of date.
 
 ## Data flows
 

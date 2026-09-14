@@ -72,9 +72,15 @@ SSH-connected servers can enable **reverse tunnel for events** (server form). Th
 
 Each server has its own tunnel port setting. Leave it empty to use the UI bind port (`PORT`, default 8080). If set, it must be between 1024 and 65535: the unprivileged SSH service account on the managed host cannot bind ports below 1024, and `ssh` only reports such a failure as a stderr warning while the connection itself stays up. The same applies when the chosen port is already occupied on the remote host, pick a free unprivileged port in that case. The tunnel port only affects the remote side; the tunnel always forwards to the UI's configured server port, so a custom tunnel port does not need to match it.
 
-For tunneled servers, the UI writes `http://localhost:<tunnel port>` into the remote action file, so the callbacks travel through the tunnel regardless of the global `CALLBACK_URL`. This means mixed setups work: keep `CALLBACK_URL` pointing at a public address for directly reachable servers while tunneled servers use the loopback URL. Plain `http` is correct inside the tunnel, the transport is already SSH-encrypted, so TLS (and `CALLBACK_INSECURE_TLS`) is irrelevant for tunneled servers.
+For tunneled servers, the UI writes `http://localhost:<tunnel port>` into the remote action file, so the callbacks travel through the tunnel regardless of the global `CALLBACK_URL`. Changing the callback URL therefore does **not** change a tunneled server's action file, and it should not: the tunnel endpoint is the correct target for that host. This means mixed setups work: keep `CALLBACK_URL` pointing at a public address for directly reachable servers while tunneled servers use the loopback URL. Plain `http` is correct inside the tunnel, the transport is already SSH-encrypted, so TLS (and `CALLBACK_INSECURE_TLS`) is irrelevant for tunneled servers.
 
 The UI checks every tunnel's SSH master connection every 45 seconds and automatically re-establishes it when it has died (for example after a short network outage), so callback delivery resumes without waiting for the next UI-triggered command. Changing a server's tunnel settings tears down the old connection and builds a new one immediately.
+
+### Keeping the action file current
+
+The UI rewrites `ui-custom-action.conf` on every managed host when it starts, whenever the callback URL or secret changes, and when a server is enabled or its tunnel settings change. It writes the file under the fail2ban configuration root that host actually uses, which is `/config/fail2ban` on containerised hosts and `/etc/fail2ban` everywhere else.
+
+If a host is unreachable at the moment you change the callback URL, it keeps the old value until the UI can reach it again. The UI compares the file against the expected content each time it reads that server's jail status, and rewrites and reloads it when the two differ. No action is needed on your side.
 
 ## Privacy and telemetry controls
 
