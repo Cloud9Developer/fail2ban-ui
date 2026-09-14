@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/swissmakers/fail2ban-ui/internal/config"
-	"github.com/swissmakers/fail2ban-ui/internal/shared"
 )
 
 // =========================================================================
@@ -60,12 +59,6 @@ func ValidateElasticsearchIndex(index string) error {
 		return fmt.Errorf("elasticsearch index must not contain '..': %q", index)
 	}
 	return nil
-}
-
-// Validates that the string is a valid IPv4/IPv6 address or CIDR notation and contains no shell metacharacters.
-// Canonical implementation lives in shared (also used by the fail2ban connectors).
-func ValidateIP(ip string) error {
-	return shared.ValidateIP(ip)
 }
 
 // Validates that an user-configured base URL is well-formed and uses an allowed scheme (http/https).
@@ -109,7 +102,6 @@ func ValidateIdentifier(name, label string) error {
 // Exposes functionality required by an external firewall vendor.
 type Integration interface {
 	ID() string
-	DisplayName() string
 	BlockIP(req Request) error
 	UnblockIP(req Request) error
 	Validate(cfg config.AdvancedActionsConfig) error

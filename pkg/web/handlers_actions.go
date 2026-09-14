@@ -94,7 +94,7 @@ func AdvancedActionsTestHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ip is required"})
 		return
 	}
-	if err := integrations.ValidateIP(req.IP); err != nil {
+	if err := shared.ValidateIP(req.IP); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

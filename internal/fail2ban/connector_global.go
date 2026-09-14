@@ -23,18 +23,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"github.com/swissmakers/fail2ban-ui/internal/shared"
 )
 
 // =========================================================================
 //  Validation
 // =========================================================================
-
-// Ensures an IP/CIDR is well-formed
-func ValidateIP(ip string) error {
-	return shared.ValidateIP(ip)
-}
 
 // Inspects fail2ban-client reload output for the markers tha indicate the daemon reloaded but a jail/filter failed to apply
 func checkReloadOutput(output string) error {
@@ -142,9 +135,7 @@ type reprScanner struct {
 	pos int
 }
 
-func (s *reprScanner) rest() string { return s.in[s.pos:] }
-func (s *reprScanner) done() bool   { return s.pos >= len(s.in) }
-
+func (s *reprScanner) done() bool { return s.pos >= len(s.in) }
 func (s *reprScanner) skipSpace() {
 	for s.pos < len(s.in) && (s.in[s.pos] == ' ' || s.in[s.pos] == '\t' || s.in[s.pos] == '\n' || s.in[s.pos] == '\r') {
 		s.pos++
@@ -279,9 +270,10 @@ type JailInfo struct {
 
 // Result of one summary fetch
 type JailSummary struct {
-	Jails            []JailInfo
-	JailLocalExists  bool
-	JailLocalManaged bool
+	Jails             []JailInfo
+	JailLocalExists   bool
+	JailLocalManaged  bool
+	ActionFileDrifted bool
 }
 
 // =========================================================================

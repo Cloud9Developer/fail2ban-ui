@@ -96,7 +96,7 @@ func (lc *LocalConnector) UnbanIP(ctx context.Context, jail, ip string) error {
 	if err := ValidateJailName(jail); err != nil {
 		return err
 	}
-	if err := ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		return err
 	}
 	args := []string{"set", jail, "unbanip", ip}
@@ -111,7 +111,7 @@ func (lc *LocalConnector) BanIP(ctx context.Context, jail, ip string) error {
 	if err := ValidateJailName(jail); err != nil {
 		return err
 	}
-	if err := ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		return err
 	}
 	args := []string{"set", jail, "banip", ip}
@@ -221,16 +221,8 @@ func (lc *LocalConnector) SetJailConfig(ctx context.Context, jail, content strin
 	return SetJailConfig(jail, content, lc.configPath())
 }
 
-func (lc *LocalConnector) TestLogpath(ctx context.Context, logpath string) ([]string, error) {
-	return TestLogpath(logpath)
-}
-
 func (lc *LocalConnector) TestLogpathWithResolution(ctx context.Context, logpath string) (originalPath, resolvedPath string, files []string, err error) {
 	return TestLogpathWithResolution(logpath, lc.configPath())
-}
-
-func (lc *LocalConnector) UpdateDefaultSettings(ctx context.Context) error {
-	return lc.EnsureJailLocalStructure(ctx)
 }
 
 func (lc *LocalConnector) EnsureJailLocalStructure(ctx context.Context) error {

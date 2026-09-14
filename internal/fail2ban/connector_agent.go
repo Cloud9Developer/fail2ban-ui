@@ -206,10 +206,6 @@ func NormalizeAgentURL(raw string) (*url.URL, error) {
 //  Connector Functions
 // =========================================================================
 
-func (ac *AgentConnector) ID() string {
-	return ac.server.ID
-}
-
 func (ac *AgentConnector) Server() shared.Fail2banServer {
 	return ac.server
 }
@@ -269,7 +265,7 @@ func (ac *AgentConnector) UnbanIP(ctx context.Context, jail, ip string) error {
 	if err := ValidateJailName(jail); err != nil {
 		return err
 	}
-	if err := ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		return err
 	}
 	payload := map[string]string{"ip": ip}
@@ -280,7 +276,7 @@ func (ac *AgentConnector) BanIP(ctx context.Context, jail, ip string) error {
 	if err := ValidateJailName(jail); err != nil {
 		return err
 	}
-	if err := ValidateIP(ip); err != nil {
+	if err := shared.ValidateIP(ip); err != nil {
 		return err
 	}
 	payload := map[string]string{"ip": ip}
@@ -587,10 +583,6 @@ func (ac *AgentConnector) TestLogpathWithResolution(ctx context.Context, logpath
 // =========================================================================
 //  Settings and Structure
 // =========================================================================
-
-func (ac *AgentConnector) UpdateDefaultSettings(ctx context.Context) error {
-	return ac.EnsureJailLocalStructure(ctx)
-}
 
 func (ac *AgentConnector) CheckJailLocalIntegrity(ctx context.Context) (bool, bool, error) {
 	var result struct {

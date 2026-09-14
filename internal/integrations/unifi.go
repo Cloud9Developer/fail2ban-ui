@@ -28,6 +28,7 @@ import (
 
 	"github.com/swissmakers/fail2ban-ui/internal/config"
 	"github.com/swissmakers/fail2ban-ui/internal/httpx"
+	"github.com/swissmakers/fail2ban-ui/internal/shared"
 )
 
 type unifiIntegration struct {
@@ -76,10 +77,6 @@ func (u *unifiIntegration) ID() string {
 	return "unifi"
 }
 
-func (u *unifiIntegration) DisplayName() string {
-	return "UniFi Network"
-}
-
 func (u *unifiIntegration) Validate(cfg config.AdvancedActionsConfig) error {
 	if err := ValidateOutboundURL(cfg.UniFi.BaseURL, "UniFi base URL"); err != nil {
 		return err
@@ -105,7 +102,7 @@ func (u *unifiIntegration) BlockIP(req Request) error {
 		return err
 	}
 
-	if err := ValidateIP(req.IP); err != nil {
+	if err := shared.ValidateIP(req.IP); err != nil {
 		return fmt.Errorf("unifi block: %w", err)
 	}
 
@@ -165,7 +162,7 @@ func (u *unifiIntegration) UnblockIP(req Request) error {
 		return err
 	}
 
-	if err := ValidateIP(req.IP); err != nil {
+	if err := shared.ValidateIP(req.IP); err != nil {
 		return fmt.Errorf("unifi unblock: %w", err)
 	}
 
@@ -228,66 +225,6 @@ func (u *unifiIntegration) UnblockIP(req Request) error {
 	list.Items = items
 
 	return u.updateList(req, list)
-}
-
-func (u *unifiIntegration) ValidateConnection(req Request) error {
-	if err := u.Validate(req.Config); err != nil {
-		return err
-	}
-
-	cfg := req.Config.UniFi
-
-	apiURL, err := u.buildURL(cfg, "sites")
-	if err != nil {
-		return err
-	}
-
-	client := httpx.Client(10*time.Second, cfg.SkipTLSVerify)
-
-	httpReq, err := http.NewRequestWithContext(
-		req.Context,
-		http.MethodGet,
-		apiURL,
-		nil,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	u.setHeaders(httpReq, cfg.APIKey)
-
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("UniFi API request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := httpx.ReadLimited(resp.Body)
-	if err != nil {
-		return fmt.Errorf("UniFi API response failed: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf(
-			"UniFi API returned %s: %s",
-			resp.Status,
-			strings.TrimSpace(string(body)),
-		)
-	}
-
-	var sites unifiSitesResponse
-
-	if err := json.Unmarshal(body, &sites); err != nil {
-		return fmt.Errorf("failed to decode UniFi sites: %w", err)
-	}
-
-	for _, site := range sites.Data {
-		if strings.EqualFold(site.Name, cfg.SiteName) {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("UniFi site %q was not found", cfg.SiteName)
 }
 
 func (u *unifiIntegration) getSiteID(req Request) (string, error) {
