@@ -166,8 +166,10 @@ function isSuspiciousLogLine(line, ip) {
   );
 
   var statusMatchArr = line.match(combinedRegex);
-  var statusMatch = statusMatchArr[1] || statusMatchArr[2] || statusMatchArr[3];
-  
+    
+  var [ , p1, p2, p3] = statusMatchArr ?? [];
+  var statusMatch = p1 || p2 || p3 || null;
+
   var statusCode = statusMatch ? parseInt(statusMatch, 10) : NaN;
 
   console.log(statusCode);
