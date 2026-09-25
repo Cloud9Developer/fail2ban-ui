@@ -166,13 +166,12 @@ function isSuspiciousLogLine(line, ip) {
   );
 
   var statusMatchArr = line.match(combinedRegex);
-    
+
   var [ , p1, p2, p3] = statusMatchArr ?? [];
   var statusMatch = p1 || p2 || p3 || null;
 
   var statusCode = statusMatch ? parseInt(statusMatch, 10) : NaN;
 
-  console.log(statusCode);
   // var statusCode = statusMatch ? parseInt(statusMatch[1], 10) : NaN;
   var hasBadStatus = !isNaN(statusCode) && statusCode >= 300;
   // Detect common attack indicators in URLs/payloads
